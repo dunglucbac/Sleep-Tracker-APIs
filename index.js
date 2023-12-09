@@ -236,51 +236,6 @@ app.get('/sleep-entries', async (req, res) => {
     }
 });
 
-// Route to edit a user's sleep entry
-app.put('/sleep-entries/:entryId', async (req, res) => {
-    try {
-        const userId = req.session.user.id; // Logged-in user's ID
-        const { entryId } = req.params;
-        const { date, sleepTime, wakeUpTime, totalSleepDuration } = req.body;
-
-        // Update the sleep entry that matches the entryId and belongs to the logged-in user
-        const updatedEntry = await SleepEntry.update(
-            { date, sleepTime, wakeUpTime, totalSleepDuration },
-            { where: { id: entryId, userId }, returning: true }
-        );
-
-        if (updatedEntry[0] === 0) {
-            return res.status(404).json({ message: 'Sleep entry not found or unauthorized' });
-        }
-
-        return res.status(200).json({ message: 'Sleep entry updated successfully', sleepEntry: updatedEntry[1][0] });
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: 'Error updating sleep entry' });
-    }
-});
-
-// Route to delete a user's sleep entry
-app.delete('/sleep-entries/:entryId', async (req, res) => {
-    try {
-        const userId = req.session.user.id; // Logged-in user's ID
-        const { entryId } = req.params;
-
-        // Delete the sleep entry that matches the entryId and belongs to the logged-in user
-        const deletedEntryCount = await SleepEntry.destroy({ where: { id: entryId, userId } });
-
-        if (deletedEntryCount === 0) {
-            return res.status(404).json({ message: 'Sleep entry not found or unauthorized' });
-        }
-
-        return res.status(200).json({ message: 'Sleep entry deleted successfully' });
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: 'Error deleting sleep entry' });
-    }
-});
-
-// Route to get average sleep duration, sleep time, and wake-up time for the entire week
 app.get('/sleep-stats/weekly', async (req, res) => {
     try {
         const userId = req.session.user.id; // Retrieve user ID from session
@@ -297,15 +252,16 @@ app.get('/sleep-stats/weekly', async (req, res) => {
             },
         });
 
-        // Calculate average sleep duration, sleep time, and wake-up time
+        // Calculate average sleep duration
         const totalSleepDuration = sleepEntries.reduce((acc, entry) => acc + entry.totalSleepDuration, 0);
-        const averageSleepDuration = totalSleepDuration / sleepEntries.length;
+        const averageSleepDuration = sleepEntries.length > 0 ? totalSleepDuration / sleepEntries.length : 0;
 
-        const totalSleepTime = sleepEntries.reduce((acc, entry) => acc + new Date(`1970-01-01T${entry.sleepTime}`).getTime(), 0);
-        const averageSleepTime = new Date(totalSleepTime / sleepEntries.length).toISOString().substr(11, 5);
+        // Calculate average sleep time and wake-up time
+        const sleepTimes = sleepEntries.map(entry => entry.sleepTime);
+        const wakeUpTimes = sleepEntries.map(entry => entry.wakeUpTime);
 
-        const totalWakeUpTime = sleepEntries.reduce((acc, entry) => acc + new Date(`1970-01-01T${entry.wakeUpTime}`).getTime(), 0);
-        const averageWakeUpTime = new Date(totalWakeUpTime / sleepEntries.length).toISOString().substr(11, 5);
+        const averageSleepTime = calculateAverageTime(sleepTimes);
+        const averageWakeUpTime = calculateAverageTime(wakeUpTimes);
 
         return res.status(200).json({
             averageSleepDuration,
@@ -317,6 +273,23 @@ app.get('/sleep-stats/weekly', async (req, res) => {
         return res.status(500).json({ message: 'Error fetching weekly sleep stats' });
     }
 });
+
+// Function to calculate average time from an array of time strings
+function calculateAverageTime(times) {
+    const timeInMilliseconds = times.map(time => {
+        const [hours, minutes] = time.split(':');
+        return new Date(1970, 0, 1, hours, minutes).getTime();
+    });
+
+    const averageTimeInMilliseconds = timeInMilliseconds.reduce((acc, val) => acc + val, 0) / timeInMilliseconds.length;
+    if (!isNaN(averageTimeInMilliseconds)) {
+        const averageDate = new Date(averageTimeInMilliseconds);
+        const formattedAverageTime = averageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        return formattedAverageTime;
+    } else {
+        return '00:00'; // Return a default time if calculation fails
+    }
+}
 
 
 app.listen(port, () => {
