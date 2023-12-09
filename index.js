@@ -236,6 +236,50 @@ app.get('/sleep-entries', async (req, res) => {
     }
 });
 
+// Route to delete a user's sleep entry
+app.delete('/sleep-entries/:entryId', async (req, res) => {
+    try {
+        const userId = req.session.user.id; // Logged-in user's ID
+        const { entryId } = req.params;
+
+        // Delete the sleep entry that matches the entryId and belongs to the logged-in user
+        const deletedEntryCount = await SleepEntry.destroy({ where: { id: entryId, userId } });
+
+        if (deletedEntryCount === 0) {
+            return res.status(404).json({ message: 'Sleep entry not found or unauthorized' });
+        }
+
+        return res.status(200).json({ message: 'Sleep entry deleted successfully' });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ message: 'Error deleting sleep entry' });
+    }
+});
+
+
+app.put('/sleep-entries/:entryId', async (req, res) => {
+    try {
+        const userId = req.session.user.id; // Logged-in user's ID
+        const { entryId } = req.params;
+        const { date, sleepTime, wakeUpTime, totalSleepDuration } = req.body;
+
+        // Update the sleep entry that matches the entryId and belongs to the logged-in user
+        const updatedEntry = await SleepEntry.update(
+            { date, sleepTime, wakeUpTime, totalSleepDuration },
+            { where: { id: entryId, userId }, returning: true }
+        );
+
+        if (updatedEntry[0] === 0) {
+            return res.status(404).json({ message: 'Sleep entry not found or unauthorized' });
+        }
+
+        return res.status(200).json({ message: 'Sleep entry updated successfully', sleepEntry: updatedEntry[1][0] });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ message: 'Error updating sleep entry' });
+    }
+});
+
 app.get('/sleep-stats/weekly', async (req, res) => {
     try {
         const userId = req.session.user.id; // Retrieve user ID from session
