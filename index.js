@@ -27,11 +27,6 @@ const authenticateUser = async (req, res, next) => {
 
 // Use the middleware globally for all routes
 app.use(authenticateUser);
-app.use(session({
-    secret: 'secret-key', // Change this to a secure random string for production
-    resave: false,
-    saveUninitialized: true
-}));
 
 app.get('/createTables', (req, res) => {
     let models = require('./models');
